@@ -10,26 +10,37 @@ async function bootstrap() {
     logger: console,
   })
   const configService = app.get<ConfigService<IEnv>>(ConfigService)
+  const apiPrefix = configService.get<string>('API_PREFIX')
+  const apiPort = configService.get<string>('API_PORT')
+  const swaggerUrl = configService.get<string>('API_SWAGGER_URL')
 
   //Swagger
   const config = new DocumentBuilder()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'Bearer',
+        in: 'Header',
+      },
+      'access-token',
+    )
     .setTitle('NetJS Basic Auth Res API')
     .setDescription('Example NestJS auth basic rest api.')
     .setVersion('3.0.3')
+    .addServer(apiPrefix)
     .addTag('User', 'User endpoint')
     .addTag('Test', 'Test endpoint')
     .build()
   const document = SwaggerModule.createDocument(app, config)
-  SwaggerModule.setup(
-    configService.get<string>('API_SWAGGER_URL'),
-    app,
-    document,
-  )
+  SwaggerModule.setup(swaggerUrl, app, document)
 
-  app.setGlobalPrefix(configService.get<string>('API_PREFIX'))
+  app.setGlobalPrefix(apiPrefix)
   app.useGlobalPipes(new ValidationPipe()) //Dtolarda tanımlanan tüm validasyonları uygulamaya yarar.
   app.enableCors()
-  await app.listen(configService.get<string>('API_PORT'))
-  console.log(`Application is running on: ${await app.getUrl()}`)
+  await app.listen(apiPort)
+  const appUrl = await app.getUrl()
+  console.log(`Application is running on: ${appUrl}`)
+  console.log(`Swagger: ${appUrl}/${swaggerUrl}`)
 }
 bootstrap()

@@ -8,22 +8,26 @@ import {
   Request,
   Param,
   HttpException,
+  HttpCode,
 } from '@nestjs/common'
 import {
   ApiCreatedResponse,
+  ApiBadRequestResponse,
   ApiOperation,
-  ApiResponse,
   ApiOkResponse,
-  ApiQuery,
-  ApiParam,
   ApiTags,
+  ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger'
 import { UserService } from './user.service'
-import { RegisterUserDto } from './dto/register-user.dto'
+import { LoginUserDto } from './dto/login-user.dto'
+import { UserDto } from './dto/user.dto'
+import { TokenDto } from './dto/token.dto'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { LocalAuthGuard } from '../common/guards/local-auth.guard'
 import { PasswordHelper } from '../common/helpers/password.helper'
 import { IUser } from './interfaces/user.interface'
+import { DefaultException } from '../common/classes/default-exception.class'
 
 @ApiTags('User')
 @Controller('user')
@@ -36,12 +40,13 @@ export class UserController {
   @ApiOperation({
     summary: 'Login',
   })
+  @ApiBody({ type: LoginUserDto })
   @ApiOkResponse({
-    description: 'User login.',
-    type: RegisterUserDto,
+    type: TokenDto,
   })
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @HttpCode(200)
   async login(@Request() req) {
     return this.service.login(req.user)
   }
@@ -49,12 +54,10 @@ export class UserController {
   @ApiOperation({
     summary: 'Register',
   })
-  @ApiOkResponse({
-    description: 'User register.',
-    type: RegisterUserDto,
-  })
+  @ApiCreatedResponse({ type: UserDto })
+  @ApiBadRequestResponse({ type: DefaultException })
   @Post('register')
-  async create(@Body() registerUserDto: RegisterUserDto) {
+  async create(@Body() registerUserDto: UserDto) {
     const userCheck = await this.service.registerFindUser(
       registerUserDto.userName,
       registerUserDto.email,
@@ -67,15 +70,16 @@ export class UserController {
     registerUserDto.password = await this.passwordHelper.passwordHash(
       registerUserDto.password,
     )
-    await this.service.register(registerUserDto)
+    return await this.service.register(registerUserDto)
   }
 
   @ApiOperation({
     summary: 'Profile',
   })
   @ApiOkResponse({
-    description: 'User profile.',
+    type: UserDto,
   })
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Request() req) {
@@ -88,8 +92,9 @@ export class UserController {
     summary: 'User by Id',
   })
   @ApiOkResponse({
-    description: 'User by Id',
+    type: UserDto,
   })
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   async getUserById(@Param('id') id: string) {
